@@ -13,6 +13,7 @@ from torch.utils.data import Dataset
 
 from config import *
 from model import *
+from dataset import *
 from train import *
 
 
@@ -36,7 +37,7 @@ _, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
 model.load_state_dict(torch.load('models/%s/model.pth' % config['name']))
 
 model.eval()
-# TODO: change dateload
+
 val_transform = Compose([
     transforms.Resize(config['input_h'], config['input_w']),
     transforms.Normalize(),
