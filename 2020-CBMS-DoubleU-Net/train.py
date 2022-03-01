@@ -7,7 +7,7 @@ from tensorflow.keras.callbacks import *
 from tensorflow.keras.optimizers import Adam, Nadam
 from tensorflow.keras.metrics import *
 from glob import glob
-from sklearn.model_selection import train_test_split
+# from sklearn.model_selection import train_test_split
 from model import build_model
 from utils import *
 from metrics import *
@@ -36,42 +36,48 @@ def parse_data(x, y):
         return x, y
 
     x, y = tf.numpy_function(_parse, [x, y], [tf.float32, tf.float32])
-    x.set_shape([384, 512, 3])
-    y.set_shape([384, 512, 2])
+    x.set_shape([512, 512, 3])
+    y.set_shape([512, 512, 2])
     return x, y
 
 def tf_dataset(x, y, batch=8):
     dataset = tf.data.Dataset.from_tensor_slices((x, y))
     dataset = dataset.shuffle(buffer_size=32)
     dataset = dataset.map(map_func=parse_data)
+    dataset = dataset.cache()
     dataset = dataset.repeat()
     dataset = dataset.batch(batch)
+    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
 
 if __name__ == "__main__":
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+    os.environ["TF_FORCE_GPU_ALLOW_GROWTH "] = 'true'
+    # tf.config.experimental.set_memory_growth(True)
+
     np.random.seed(42)
     tf.random.set_seed(42)
     create_dir("files")
 
-    train_path = "../1/new_data/train/"
-    valid_path = "../1/new_data/valid/"
+    train_path = "/home/xzf/Projects/Datasets/PE_data_tf/train"
+    valid_path = "/home/xzf/Projects/Datasets/PE_data_tf/valid/"
 
     ## Training
-    train_x = sorted(glob(os.path.join(train_path, "image", "*.jpg")))
-    train_y = sorted(glob(os.path.join(train_path, "mask", "*.jpg")))
+    train_x = sorted(glob(os.path.join(train_path, "image", "*.png")))
+    train_y = sorted(glob(os.path.join(train_path, "mask", "*.png")))
 
     ## Shuffling
     train_x, train_y = shuffling(train_x, train_y)
 
     ## Validation
-    valid_x = sorted(glob(os.path.join(valid_path, "image", "*.jpg")))
-    valid_y = sorted(glob(os.path.join(valid_path, "mask", "*.jpg")))
+    valid_x = sorted(glob(os.path.join(valid_path, "image", "*.png")))
+    valid_y = sorted(glob(os.path.join(valid_path, "mask", "*.png")))
 
     model_path = "files/model.h5"
-    batch_size = 16
+    batch_size = 2
     epochs = 300
     lr = 1e-4
-    shape = (384, 512, 3)
+    shape = (512, 512, 3)
 
     model = build_model(shape)
     metrics = [
