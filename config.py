@@ -1,5 +1,5 @@
 config = {}
-config['gpu'] = '0'
+config['gpu'] = '3'
 config['name'] = None
 config['epochs'] = 300
 config['batch_size'] = 4
@@ -22,7 +22,7 @@ config['test_size'] = 5             # 测试集的序列数量，剩下的序列
 
 config['optimizer'] = 'Adam'
 config['lr'] = 1e-5
-config['weight_decay'] = 1e-3
+# config['weight_decay'] = 0        # 1e-3, 官方tf用的adam没有weight decay
 config['momentum'] = 0.9
 config['nesterov'] = False
 

@@ -12,7 +12,8 @@ import argparse
 from utils.metrics import *
 from config import *
 from DoubleUNet import *
-
+from utils.netword_util import *
+from double_unet import DoubleUnet
 
 def str2bool(v):
     if v.lower() in ['true', '1']:
@@ -48,11 +49,9 @@ class AverageMeter(object):
 def train(config, train_loader, model, criterion, optimizer):
     global dice_score
     avg_meters = {'loss': AverageMeter(), 'iou': AverageMeter(), 'dice_coef': AverageMeter()}
-    # os.environ["CUDA_VISIBLE_DEVICES"] = "2"
     model.train()
 
     pbar = tqdm(total=len(train_loader))
-
     for input, target in train_loader:
         input, target = input.cuda(), target.cuda()
 
@@ -147,11 +146,14 @@ if __name__ == '__main__':
     cudnn.benchmark = True
 
     # model = DoubleUNet(config['num_classes'],config['input_channels'])
+    # import torchvision.models as models
+    # model = DoubleUnet(models.vgg19_bn()).cuda()
     model = DoubleUNet().cuda()
+    # model.apply(init_weights_kaiming)
 
     params = filter(lambda p: p.requires_grad, model.parameters())
     if config['optimizer'] == 'Adam':
-        optimizer = optim.Adam(params, lr=config['lr'], weight_decay=config['weight_decay'])
+        optimizer = optim.Adam(params, lr=config['lr'])
     elif config['optimizer'] == 'SGD':
         optimizer = optim.SGD(params, lr=config['lr'], momentum=config['momentum'],
                               nesterov=config['nesterov'], weight_decay=config['weight_decay'])
@@ -171,21 +173,9 @@ if __name__ == '__main__':
     else:
         raise NotImplementedError
 
-    # img_ids = glob(os.path.join(config['dataset'], 'Original/*')) # 错误！！！img_ids内存的都是完整路径
-    # img_ids = os.listdir(os.path.join(config['dataset'], 'ISIC2018_Task1-2_Training_Input'))
-    # mask_ids = glob(os.path.join(config['dataset'], 'masks', '*' + config['mask_ext']))
-    # img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
-    #
-    # len_ids = len(img_ids)
-    # train_size = int((80/100)*len_ids)
-    # test_size = int((20/100)*len_ids)
-    #
-    # train_img_ids, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
-    # train_mask_ids, val_mask_ids = train_test_split(mask_ids, test_size=0.2, random_state=41)
-
     train_transforms = utils.data_transforms.Compose([
         utils.data_transforms.RandomCrop(config['input_h'], config['input_w']),  # TODO: crop or resize?
-        utils.data_transforms.ColorJitter(config['color_jitter']),
+        # utils.data_transforms.ColorJitter(config['color_jitter']),
         utils.data_transforms.Normalize(mean=0, std=255),
         utils.data_transforms.RandomVerticalFlip(),
         utils.data_transforms.RandomHorizontalFlip(),
