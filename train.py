@@ -13,7 +13,6 @@ from utils.metrics import *
 from config import *
 from DoubleUNet import *
 from utils.netword_util import *
-from double_unet import DoubleUnet
 from datetime import datetime as dt
 
 
@@ -187,13 +186,14 @@ if __name__ == '__main__':
             scheduler.step()
         elif config['scheduler'] == 'ReduceLROnPlateau':
             scheduler.step(val_log['loss'])
+        writer.add_scalar('PE_Seg/lr', scheduler.get_last_lr()[0], epoch)
 
         print('loss %.4f - iou %.4f - dice %.4f - val_loss %.4f - val_iou %.4f -val_dice %.4f'
               % (train_log['loss'], train_log['iou'], train_log['dice_coef'],
                  val_log['loss'], val_log['iou'], val_log['dice_coef']))
 
         log['epoch'].append(epoch)
-        log['lr'].append(config['lr'])
+        log['lr'].append(scheduler.get_last_lr()[0])
         log['loss'].append(train_log['loss'])
         log['iou'].append(train_log['iou'])
         log['dice'].append(train_log['dice_coef'])
@@ -207,8 +207,8 @@ if __name__ == '__main__':
 
         if val_log['dice_coef'] > best_dice:
             best_dice = val_log['dice_coef']
-            torch.save(model.state_dict(), os.path.join(output_folder, 'model_{}.pth'.format(best_dice)))
-            print("=> saved best model, dice_coef = {}".format(best_dice))
+            torch.save(model.state_dict(), os.path.join(output_folder, 'model_{:.4f}.pth'.format(best_dice)))
+            print("=> saved best model, dice_coef = {:.4f}".format(best_dice))
             trigger = 0
 
         # early stopping

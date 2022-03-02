@@ -22,7 +22,7 @@ config['mask_label'] = 'label'      # mask文件夹名称
 config['test_size'] = 5             # 测试集的序列数量，剩下的序列全都给训练集
 
 config['optimizer'] = 'Adam'
-config['lr'] = 1e-5
+config['lr'] = 1e-4
 # config['weight_decay'] = 0        # 1e-3, 官方tf用的adam没有weight decay
 config['momentum'] = 0.9
 config['nesterov'] = False
