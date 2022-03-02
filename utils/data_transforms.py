@@ -76,15 +76,10 @@ class RandomColorChannel(object):
 
 
 class Normalize(object):
-    def __init__(self, mean, std):
-        self.mean = mean
-        self.std = std
-
     def __call__(self, img, mask):
-        img = img / self.std - self.mean
-        mask = mask / self.std - self.mean
-
-        return img, mask
+        img = (img - np.median(img)+127)/255.
+        mask = mask/255.
+        return img.astype(np.float32), mask.astype(np.float32)
 
 
 class RandomCrop(object):

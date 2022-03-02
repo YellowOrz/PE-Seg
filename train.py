@@ -8,42 +8,13 @@ import torch.backends.cudnn as cudnn
 import torch.optim as optim
 from torch.optim import lr_scheduler
 from torch.utils.data import Dataset
-import argparse
+from tensorboardX import SummaryWriter
 from utils.metrics import *
 from config import *
 from DoubleUNet import *
 from utils.netword_util import *
 from double_unet import DoubleUnet
-
-def str2bool(v):
-    if v.lower() in ['true', '1']:
-        return True
-    elif v.lower() in ['false', '0']:
-        return False
-    else:
-        return argparse.ArgumentTypeError('Boolean Value Expected')
-
-
-def count_params(model):
-    return (sum(p.numel()) for p in model.parameters() if p.requires_grad)
-
-
-class AverageMeter(object):
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
+from datetime import datetime as dt
 
 
 def train(config, train_loader, model, criterion, optimizer):
@@ -74,7 +45,7 @@ def train(config, train_loader, model, criterion, optimizer):
 
         avg_meters['loss'].update(loss.item(), input.size(0))
         avg_meters['iou'].update(iou, input.size(0))
-        avg_meters['dice_coef'].update(dice_score, input.size(0))
+        avg_meters['dice_coef'].update(dice_score.item(), input.size(0))
 
         postfix = OrderedDict([('loss', avg_meters['loss'].avg), ('iou', avg_meters['iou'].avg),
                                ('dice_coef', avg_meters['dice_coef'].avg)])
@@ -82,8 +53,8 @@ def train(config, train_loader, model, criterion, optimizer):
         pbar.update(1)
     pbar.close()
 
-    return OrderedDict([('loss', avg_meters['loss'].avg), ('iou', avg_meters['iou'].avg),
-                        ('dice_coef', avg_meters['dice_coef'].avg)])
+    return OrderedDict([('loss', avg_meters['loss'].avg), ('dice_coef', avg_meters['dice_coef'].avg), ('iou', avg_meters['iou'].avg),
+                        ('outimg0', output[0,:1].detach().cpu()), ('outimg1', output[0,-1:].detach().cpu())])
 
 
 def validate(config, val_loader, model, criterion):
@@ -115,7 +86,7 @@ def validate(config, val_loader, model, criterion):
 
             avg_meters['loss'].update(loss.item(), input.size(0))
             avg_meters['iou'].update(iou, input.size(0))
-            avg_meters['dice_coef'].update(dice_score, input.size(0))
+            avg_meters['dice_coef'].update(dice_score.item(), input.size(0))
 
             postfix = OrderedDict([('loss', avg_meters['loss'].avg), ('iou', avg_meters['iou'].avg),
                                    ('dice_coef', avg_meters['dice_coef'].avg)])
@@ -124,7 +95,7 @@ def validate(config, val_loader, model, criterion):
         pbar.close()
 
     return OrderedDict([('loss', avg_meters['loss'].avg), ('iou', avg_meters['iou'].avg),
-                        ('dice_coef', avg_meters['dice_coef'].avg)])
+                        ('dice_coef', avg_meters['dice_coef'].avg), ('outimg0', output[0,:1]), ('outimg1', output[0,-1:])])
 
 
 if __name__ == '__main__':
@@ -140,16 +111,15 @@ if __name__ == '__main__':
     for key in config:
         print('%s: %s' % (key, config[key]))
     print('-' * 20)
+    output_folder = os.path.join(config['out_dir'], config['name']+ '_' + dt.now().strftime("%m-%d-%H-%M-%S"))
 
-    criterion = nn.BCEWithLogitsLoss() if config['loss'] == 'BCEWithLogitsLoss' else BCEDiceLoss()
-
+    criterion = eval(config['loss'])
+    writer = SummaryWriter(output_folder)
     cudnn.benchmark = True
 
-    # model = DoubleUNet(config['num_classes'],config['input_channels'])
-    # import torchvision.models as models
-    # model = DoubleUnet(models.vgg19_bn()).cuda()
     model = DoubleUNet().cuda()
     # model.apply(init_weights_kaiming)
+    print_network(model)
 
     params = filter(lambda p: p.requires_grad, model.parameters())
     if config['optimizer'] == 'Adam':
@@ -176,7 +146,7 @@ if __name__ == '__main__':
     train_transforms = utils.data_transforms.Compose([
         utils.data_transforms.RandomCrop(config['input_h'], config['input_w']),  # TODO: crop or resize?
         # utils.data_transforms.ColorJitter(config['color_jitter']),
-        utils.data_transforms.Normalize(mean=0, std=255),
+        utils.data_transforms.Normalize(),
         utils.data_transforms.RandomVerticalFlip(),
         utils.data_transforms.RandomHorizontalFlip(),
         # utils.data_transforms.RandomGaussianNoise(cfg.DATA.GAUSSIAN),
@@ -184,22 +154,10 @@ if __name__ == '__main__':
     ])
 
     test_transforms = utils.data_transforms.Compose([
-        utils.data_transforms.Normalize(mean=0, std=255),
+        utils.data_transforms.Normalize(),
         utils.data_transforms.ToTensor(),
     ])
-    # train_transform = Compose([transforms.RandomRotate90(), transforms.Flip(),
-    #                            OneOf([transforms.HueSaturationValue(), transforms.RandomBrightnessContrast()]),# , p=1?
-    #                            transforms.Resize(config['input_h'], config['input_w']), transforms.Normalize()])
-    #
-    # test_transform = Compose([transforms.Resize(config['input_h'], config['input_w']),
-    #                          transforms.Normalize(), ])
-    #
-    # train_dataset = Data(img_ids=train_img_ids, num_classes=config['num_classes'], transform=train_transform,
-    #                      img_dir=os.path.join(config['dataset'], 'ISIC2018_Task1-2_Training_Input'),
-    #                      mask_dir=os.path.join(config['dataset'], 'ISIC2018_Task1_Training_GroundTruth'))
-    # val_dataset = Data(img_ids=val_img_ids, num_classes=config['num_classes'], transform=val_transform,
-    #                    img_dir=os.path.join('inputs', config['dataset'], 'ISIC2018_Task1-2_Training_Input'),
-    #                    mask_dir=os.path.join('inputs', config['dataset'], 'ISIC2018_Task1_Training_GroundTruth'))
+
     train_dataset = utils.data_loaders.DatasetSeq(config['dataset'], config['img_label'], config['mask_label'], 'train',
                                                   config['test_size'], config['num_classes'], train_transforms)
     test_dataset = utils.data_loaders.DatasetSeq(config['dataset'], config['img_label'], config['mask_label'], 'test',
@@ -220,8 +178,10 @@ if __name__ == '__main__':
 
         # train for one epoch
         train_log = train(config, train_loader, model, criterion, optimizer)
+        log2tensorboard(writer, train_log, epoch, 'tarin')
         # evaluate on validation set
         val_log = validate(config, val_loader, model, criterion)
+        log2tensorboard(writer, val_log, epoch, 'val')
 
         if config['scheduler'] == 'CosineAnnealingLR':
             scheduler.step()
@@ -241,14 +201,14 @@ if __name__ == '__main__':
         log['val_iou'].append(val_log['iou'])
         log['val_dice'].append(val_log['dice_coef'])
 
-        pd.DataFrame(log).to_csv('models/%s/log.csv' % config['name'], index=False)
+        pd.DataFrame(log).to_csv(os.path.join(output_folder, 'log.csv'.format(best_dice)), index=False)
 
         trigger += 1
 
         if val_log['dice_coef'] > best_dice:
-            torch.save(model.state_dict(), 'models/%s/model.pth' % config['name'])
             best_dice = val_log['dice_coef']
-            print("=> saved best model")
+            torch.save(model.state_dict(), os.path.join(output_folder, 'model_{}.pth'.format(best_dice)))
+            print("=> saved best model, dice_coef = {}".format(best_dice))
             trigger = 0
 
         # early stopping

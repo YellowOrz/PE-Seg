@@ -3,3 +3,7 @@ venv
 .idea
 __pycache__
 log*
+results
+*pth
+*csv
+*h5

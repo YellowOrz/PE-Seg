@@ -192,7 +192,7 @@ class Decoder2(nn.Module):
 class DoubleUNet(nn.Module):
     def __init__(self):
         super().__init__()
-        self.encoder1 = Encoder1()
+        self.encoder1 = Encoder1(requires_grad=True)
         self.aspp1 = ASPP(512, 64, [6,12,18])  # 512是VGG（encoder1）输出的通道数，64跟源码保持一致（应该为256比较妥当叭？）
         self.decoder1 = Decoder1(64)  # 输出通道数为
         self.encoder2 = Encoder2(3)
