@@ -77,7 +77,7 @@ class RandomColorChannel(object):
 
 class Normalize(object):
     def __call__(self, img, mask):
-        img = (img - np.median(img)+127)/255.
+        img = np.clip(img - np.median(img)+127, 0, 255)/255.
         mask = mask/255.
         return img.astype(np.float32), mask.astype(np.float32)
 

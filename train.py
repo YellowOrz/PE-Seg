@@ -52,8 +52,11 @@ def train(config, train_loader, model, criterion, optimizer):
         pbar.update(1)
     pbar.close()
 
-    return OrderedDict([('loss', avg_meters['loss'].avg), ('dice_coef', avg_meters['dice_coef'].avg), ('iou', avg_meters['iou'].avg),
-                        ('outimg0', output[0,:1].detach().cpu()), ('outimg1', output[0,-1:].detach().cpu())])
+    save_img0 = torch.cat([input[0], output[0, :1].expand(3, -1, -1), target[0, :1].expand(3, -1, -1)], dim=-1)
+    save_img1 = torch.cat([input[0], output[0, -1:].expand(3, -1, -1), target[0, :1].expand(3, -1, -1)], dim=-1)
+    return OrderedDict(
+        [('loss', avg_meters['loss'].avg), ('dice_coef', avg_meters['dice_coef'].avg), ('iou', avg_meters['iou'].avg),
+         ('outimg0', save_img0.detach().cpu()), ('outimg1', save_img1.detach().cpu())])
 
 
 def validate(config, val_loader, model, criterion):
@@ -92,9 +95,10 @@ def validate(config, val_loader, model, criterion):
             pbar.set_postfix(postfix)
             pbar.update(1)
         pbar.close()
-
+    save_img0 = torch.cat([input[0], output[0, :1].expand(3, -1, -1), target[0, :1].expand(3, -1, -1)], dim=-1)
+    save_img1 = torch.cat([input[0], output[0, -1:].expand(3, -1, -1), target[0, :1].expand(3, -1, -1)], dim=-1)
     return OrderedDict([('loss', avg_meters['loss'].avg), ('iou', avg_meters['iou'].avg),
-                        ('dice_coef', avg_meters['dice_coef'].avg), ('outimg0', output[0,:1]), ('outimg1', output[0,-1:])])
+                        ('dice_coef', avg_meters['dice_coef'].avg), ('outimg0', save_img0), ('outimg1', save_img1)])
 
 
 if __name__ == '__main__':
@@ -110,7 +114,8 @@ if __name__ == '__main__':
     for key in config:
         print('%s: %s' % (key, config[key]))
     print('-' * 20)
-    output_folder = os.path.join(config['out_dir'], config['name']+ '_' + dt.now().strftime("%m-%d-%H-%M-%S"))
+    output_folder = os.path.join(config['out_dir'], config['name'] + '_' + dt.now().strftime("%m-%d-%H-%M-%S"))
+    print(output_folder)
 
     criterion = eval(config['loss'])
     writer = SummaryWriter(output_folder)
@@ -163,12 +168,12 @@ if __name__ == '__main__':
                                                  config['test_size'], config['num_classes'], test_transforms)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True,
                                                num_workers=config['num_workers'], pin_memory=True,
-                                               drop_last=True)      # drop_last必须，为了防止BN报错
+                                               drop_last=True)  # drop_last必须，为了防止BN报错
     val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=config['batch_size'], shuffle=False,
                                              num_workers=config['num_workers'], pin_memory=True)
 
-    log = OrderedDict([('epoch', []),('lr', []),('loss', []),('iou', []),('dice', []),
-                       ('val_loss', []),('val_iou', []),('val_dice', [])])
+    log = OrderedDict([('epoch', []), ('lr', []), ('loss', []), ('iou', []), ('dice', []),
+                       ('val_loss', []), ('val_iou', []), ('val_dice', [])])
 
     best_dice = 0
     trigger = 0
@@ -185,15 +190,15 @@ if __name__ == '__main__':
         if config['scheduler'] == 'CosineAnnealingLR':
             scheduler.step()
         elif config['scheduler'] == 'ReduceLROnPlateau':
-            scheduler.step(val_log['loss'])
-        writer.add_scalar('PE_Seg/lr', scheduler.get_last_lr()[0], epoch)
+            scheduler.step(train_log['loss'])
+        writer.add_scalar('PE_Seg/lr', optimizer.state_dict()['param_groups'][0]['lr'], epoch)
 
         print('loss %.4f - iou %.4f - dice %.4f - val_loss %.4f - val_iou %.4f -val_dice %.4f'
               % (train_log['loss'], train_log['iou'], train_log['dice_coef'],
                  val_log['loss'], val_log['iou'], val_log['dice_coef']))
 
         log['epoch'].append(epoch)
-        log['lr'].append(scheduler.get_last_lr()[0])
+        log['lr'].append(optimizer.state_dict()['param_groups'][0]['lr'])
         log['loss'].append(train_log['loss'])
         log['iou'].append(train_log['iou'])
         log['dice'].append(train_log['dice_coef'])

@@ -1,5 +1,5 @@
 config = {}
-config['gpu'] = '3'
+config['gpu'] = '1'
 config['out_dir'] = './results'
 config['name'] = None
 config['epochs'] = 300
@@ -30,7 +30,7 @@ config['nesterov'] = False
 config['scheduler'] = 'ReduceLROnPlateau'
 config['min_lr'] = 1e-8
 config['factor'] = 0.1
-config['patience'] = 20
+config['patience'] = 50
 config['milestones'] = '1.2'
 config['gamma'] = 2 / 3
 config['early_stopping'] = -1
