@@ -7,6 +7,7 @@ import pandas as pd
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
 from torch.optim import lr_scheduler
+from torchvision import transforms
 from torch.utils.data import Dataset
 from tensorboardX import SummaryWriter
 from utils.metrics import *
@@ -29,6 +30,7 @@ def train(config, train_loader, model, criterion, optimizer):
             outputs = model(input)
             loss = 0
             for output in outputs:
+
                 loss += criterion(output, target)
             loss /= len(outputs)
             iou = iou_score(outputs[-1], target)
@@ -148,11 +150,13 @@ if __name__ == '__main__':
         raise NotImplementedError
 
     train_transforms = utils.data_transforms.Compose([
-        utils.data_transforms.RandomCrop(config['input_h'], config['input_w']),  # TODO: crop or resize?
+
+        # utils.data_transforms.RandomCrop(config['input_h'], config['input_w']),  # TODO: crop or resize?
         # utils.data_transforms.ColorJitter(config['color_jitter']),
+        # utils.data_transforms.Resize([512,512]),
         utils.data_transforms.Normalize(),
-        utils.data_transforms.RandomVerticalFlip(),
-        utils.data_transforms.RandomHorizontalFlip(),
+        # utils.data_transforms.RandomVerticalFlip(),
+        # utils.data_transforms.RandomHorizontalFlip(),
         # utils.data_transforms.RandomGaussianNoise(cfg.DATA.GAUSSIAN),
         utils.data_transforms.ToTensor(),
     ])
@@ -171,10 +175,8 @@ if __name__ == '__main__':
                                                drop_last=True)  # drop_last必须，为了防止BN报错
     val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=config['batch_size'], shuffle=False,
                                              num_workers=config['num_workers'], pin_memory=True)
-
     log = OrderedDict([('epoch', []), ('lr', []), ('loss', []), ('iou', []), ('dice', []),
                        ('val_loss', []), ('val_iou', []), ('val_dice', [])])
-
     best_dice = 0
     trigger = 0
     for epoch in range(config['epochs']):
@@ -190,7 +192,7 @@ if __name__ == '__main__':
         if config['scheduler'] == 'CosineAnnealingLR':
             scheduler.step()
         elif config['scheduler'] == 'ReduceLROnPlateau':
-            scheduler.step(train_log['loss'])
+            scheduler.step(val_log['loss'])
         writer.add_scalar('PE_Seg/lr', optimizer.state_dict()['param_groups'][0]['lr'], epoch)
 
         print('loss %.4f - iou %.4f - dice %.4f - val_loss %.4f - val_iou %.4f -val_dice %.4f'

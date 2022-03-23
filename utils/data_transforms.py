@@ -121,6 +121,18 @@ class RandomVerticalFlip(object):
         return img, mask
 
 
+class Resize(object):  # TODO: check
+    def __init__(self, size, interpolation=Image.BILINEAR):
+        # assert isinstance(size, int) or (isinstance(size, Iterable) and len(size) == 2)
+        self.size = size
+        self.interpolation = interpolation
+
+    def __call__(self, img, mask):
+        img = F.resize(img, self.size, self.interpolation)
+        mask = F.resize(mask, self.size, self.interpolation)
+        return img, mask
+
+
 class ToTensor(object):
     """Converts a numpy.ndarray (H x W x C) to a torch.FloatTensor of shape (C x H x W)."""
 

@@ -16,7 +16,7 @@ config['color_jitter'] = [0.1, 0.1, 0.1, 0.1]  # brightness, contrast, saturatio
 
 config['loss'] = 'dice_loss'        # dice_loss, bce_dice_loss
 
-config['dataset'] = '/home/xzf/Projects/Datasets/PE_data_edited/PAT*'
+config['dataset'] = '/home/xzf/Projects/Datasets/PE_data_pytorch/PAT*'
 config['img_label'] = 'original'      # img文件夹名称
 config['mask_label'] = 'label'      # mask文件夹名称
 config['test_size'] = 5             # 测试集的序列数量，剩下的序列全都给训练集
