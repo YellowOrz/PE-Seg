@@ -151,12 +151,12 @@ if __name__ == '__main__':
 
     train_transforms = utils.data_transforms.Compose([
 
-        # utils.data_transforms.RandomCrop(config['input_h'], config['input_w']),  # TODO: crop or resize?
+        utils.data_transforms.RandomCrop(config['input_h'], config['input_w']),  # TODO: crop or resize?
         # utils.data_transforms.ColorJitter(config['color_jitter']),
         # utils.data_transforms.Resize([512,512]),
         utils.data_transforms.Normalize(),
-        # utils.data_transforms.RandomVerticalFlip(),
-        # utils.data_transforms.RandomHorizontalFlip(),
+        utils.data_transforms.RandomVerticalFlip(),
+        utils.data_transforms.RandomHorizontalFlip(),
         # utils.data_transforms.RandomGaussianNoise(cfg.DATA.GAUSSIAN),
         utils.data_transforms.ToTensor(),
     ])
@@ -186,7 +186,10 @@ if __name__ == '__main__':
         train_log = train(config, train_loader, model, criterion, optimizer)
         log2tensorboard(writer, train_log, epoch, 'tarin')
         # evaluate on validation set
-        val_log = validate(config, val_loader, model, criterion)
+        if epoch % config['val_frequency'] == 0:
+            val_log = validate(config, val_loader, model, criterion)
+        else:
+            val_log = val_log
         log2tensorboard(writer, val_log, epoch, 'val')
 
         if config['scheduler'] == 'CosineAnnealingLR':

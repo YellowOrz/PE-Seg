@@ -3,15 +3,16 @@ config['gpu'] = '1'
 config['out_dir'] = './results'
 config['name'] = None
 config['epochs'] = 300
-config['batch_size'] = 4
+config['batch_size'] = 8
 config['num_workers'] = 2   # 并行读取数据
+config['val_frequency'] = 2
 
 config['arch'] = 'DoubleUNet'
 config['deep_supervision'] = False
 config['input_channels'] = 3
 config['num_classes'] = 1
-config['input_w'] = 384
-config['input_h'] = 512
+config['input_w'] = 256
+config['input_h'] = 256
 config['color_jitter'] = [0.1, 0.1, 0.1, 0.1]  # brightness, contrast, saturation, hue
 
 config['loss'] = 'dice_loss'        # dice_loss, bce_dice_loss
