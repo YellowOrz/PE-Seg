@@ -4,7 +4,7 @@ config['out_dir'] = './results'
 config['name'] = None
 config['epochs'] = 300
 config['batch_size'] = 8
-config['num_workers'] = 2   # 并行读取数据
+config['num_workers'] = 0  # 并行读取数据
 config['val_frequency'] = 2
 
 config['arch'] = 'DoubleUNet'
@@ -15,7 +15,7 @@ config['input_w'] = 256
 config['input_h'] = 256
 config['color_jitter'] = [0.1, 0.1, 0.1, 0.1]  # brightness, contrast, saturation, hue
 
-config['loss'] = 'dice_loss'        # dice_loss, bce_dice_loss
+config['loss'] = 'tversky_focal_loss'        # dice_loss, bce_dice_loss
 
 config['dataset'] = '/home/xzf/Projects/Datasets/PE_data_pytorch/PAT*'
 config['img_label'] = 'original'      # img文件夹名称

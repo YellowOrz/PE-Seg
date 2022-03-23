@@ -26,6 +26,18 @@ def iou_score(output, target):  # TODO: 跟tf版不一样
 
     return ((intersection + smooth) / (union + smooth)).item()
 
+def tversky_focal_loss(output, target):
+        alpha=0.7
+        gama=0.75
+        beta = 1 - alpha
+        smooth = 1e-5
+        output = output.view(-1)
+        target = target.view(-1)
+        TP = (output * target).sum()
+        FN = ((1 - output) * target).sum()
+        FP = ((1 - target) * output).sum()
+        TI = (TP + smooth) / (TP + alpha * FN + beta * FP + smooth)
+        return pow(1 - TI, gama)
 
 class AverageMeter(object):
 
