@@ -50,9 +50,10 @@ def tf_dataset(x, y, batch=8):
     dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
 
+
 if __name__ == "__main__":
-    os.environ["CUDA_VISIBLE_DEVICES"] = '0'
-    os.environ["TF_FORCE_GPU_ALLOW_GROWTH "] = 'true'
+    os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+    os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = 'true'
     # tf.config.experimental.set_memory_growth(True)
 
     np.random.seed(42)
@@ -60,7 +61,7 @@ if __name__ == "__main__":
     create_dir("files")
 
     train_path = "/home/xzf/Projects/Datasets/PE_data_tf/train"
-    valid_path = "/home/xzf/Projects/Datasets/PE_data_tf/valid/"
+    valid_path = "/home/xzf/Projects/Datasets/PE_data_tf/valid"
 
     ## Training
     train_x = sorted(glob(os.path.join(train_path, "image", "*.png")))
@@ -83,8 +84,6 @@ if __name__ == "__main__":
     metrics = [
         dice_coef,
         iou,
-        Recall(),
-        Precision()
     ]
     
     train_dataset = tf_dataset(train_x, train_y, batch=batch_size)
