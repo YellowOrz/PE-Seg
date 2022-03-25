@@ -229,7 +229,6 @@ def attn_reg_ds(opt,input_size, lossfxn):
 
 
 #model proposed in my paper - improved attention u-net with multi-scale input pyramid and deep supervision
-
 def attn_reg(opt,input_size, lossfxn):
     
     img_input = Input(shape=input_size, name='input_scale1')

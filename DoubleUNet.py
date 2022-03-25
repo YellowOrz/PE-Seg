@@ -8,7 +8,7 @@ from typing import List
 class Squeeze_Excite(nn.Module):
     def __init__(self, channel, reduction=8):
         super().__init__()
-        self.avgpool = nn.AdaptiveAvgPool2d(1)      # 等价于Global Average Pooling
+        self.avgpool = nn.AdaptiveAvgPool2d(1)  # 等价于Global Average Pooling
         self.fc = nn.Sequential(nn.Linear(channel, channel // reduction, bias=False),
                                 nn.ReLU(inplace=True),
                                 nn.Linear(channel // reduction, channel, bias=False),
@@ -25,13 +25,53 @@ class Conv_Block(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.feature = nn.Sequential(nn.Conv2d(in_channels, out_channels, 3, padding=1),
-                                     nn.BatchNorm2d(out_channels),nn.ReLU(inplace=True),
+                                     nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True),
                                      nn.Conv2d(out_channels, out_channels, 3, padding=1),
-                                     nn.BatchNorm2d(out_channels),nn.ReLU(inplace=True),
+                                     nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True),
                                      Squeeze_Excite(out_channels))
 
     def forward(self, x):
         return self.feature(x)
+
+
+class Gate_Block(nn.Module):
+    def __init__(self, out_channels):
+        super().__init__()
+        self.feature = nn.Sequential(nn.Conv2d(out_channels, out_channels, 1, padding=0),
+                                     nn.BatchNorm2d(out_channels),
+                                     nn.ReLU(inplace=True))
+
+    def forward(self, x):
+        return self.feature(x)
+
+
+class Attn_Block(nn.Module):
+    def __init__(self, in_channels_x, in_channels_g, out_channels):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels_x, out_channels, 2, 2)
+        self.conv2 = nn.Conv2d(in_channels_g, out_channels, 1)
+        self.upsample1 = nn.ConvTranspose2d(out_channels, out_channels, 3, 2)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv3 = nn.Conv2d(out_channels, 1, 1)
+        self.sigmoid = nn.Sigmoid()
+        self.conv4 = nn.Sequential(nn.Conv2d(in_channels_x, in_channels_x, 1),
+                                   nn.BatchNorm2d(in_channels_x))
+
+    def forward(self, x, g):
+        N,C,H,W = x.size()
+        theta_x = self.conv1(x)
+        _,_,H_,W_ = theta_x.size()
+        pad_H, pad_W = H - H_, W - W_
+        theta_x = nn.functional.pad(theta_x, pad=(pad_W//2, pad_W - pad_W//2, pad_H//2, pad_W - pad_H//2))
+        phi_g = self.conv2(g)
+        upsample_g = nn.functional.interpolate(self.upsample1(phi_g), (H,W))
+        concat_xg = theta_x + upsample_g
+        act_xg = self.relu(concat_xg)
+        psi = self.conv3(act_xg)
+        sigmoid_xg = self.sigmoid(psi)
+        y=sigmoid_xg * x
+
+        return self.conv4(y)
 
 
 class Encoder1(nn.Module):  # 没有问题，by xzf
@@ -39,8 +79,8 @@ class Encoder1(nn.Module):  # 没有问题，by xzf
         super().__init__()
         self.feature_list = [3, 8, 17, 26]
         base_model = tv.models.vgg19(pretrained=True).features
-        self.model = nn.Sequential(*list(base_model.children())[:len(base_model)-1])
-        if not requires_grad:       # vgg无需梯度更新
+        self.model = nn.Sequential(*list(base_model.children())[:len(base_model) - 1])
+        if not requires_grad:  # vgg无需梯度更新
             for param in self.parameters():
                 param.requires_grad = False
 
@@ -58,18 +98,18 @@ class ASPP(nn.Module):
         super(ASPP, self).__init__()
 
         self.pool = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
-                                    nn.Conv2d(in_channel, out_channel, 1),
-                                    nn.BatchNorm2d(out_channel),
-                                    nn.ReLU(inplace=True))
+                                  nn.Conv2d(in_channel, out_channel, 1),
+                                  nn.BatchNorm2d(out_channel),
+                                  nn.ReLU(inplace=True))
         self.blocks = nn.ModuleList()
         self.blocks.append(nn.Sequential(nn.Conv2d(in_channel, out_channel, 1, bias=False),
-                                    nn.BatchNorm2d(out_channel),
-                                    nn.ReLU(inplace=True)))
+                                         nn.BatchNorm2d(out_channel),
+                                         nn.ReLU(inplace=True)))
         for r in rate:
             self.blocks.append(nn.Sequential(nn.Conv2d(in_channel, out_channel, 3, padding=r, dilation=r, bias=False),
-                                    nn.BatchNorm2d(out_channel),
-                                    nn.ReLU(inplace=True)))
-        self.project = nn.Sequential(nn.Conv2d(out_channel * (len(self.blocks)+1), out_channel, 1, bias=False),
+                                             nn.BatchNorm2d(out_channel),
+                                             nn.ReLU(inplace=True)))
+        self.project = nn.Sequential(nn.Conv2d(out_channel * (len(self.blocks) + 1), out_channel, 1, bias=False),
                                      nn.BatchNorm2d(out_channel),
                                      nn.ReLU(inplace=True))
 
@@ -173,16 +213,33 @@ class Decoder2(nn.Module):
         super().__init__()
         skp1_channels = [512, 256, 128, 64]
         skp2_channels = [256, 128, 64, 32]
+        gate_channels = [64, 256, 128]
+        inter_channels = [128,64,32]
         num_filters = [256, 128, 64, 32]
         self.conv_block = nn.ModuleList()
         self.upsample = nn.ModuleList()
+        self.GatingSignal1 = nn.ModuleList()
+        self.GatingSignal2 = nn.ModuleList()
+        self.AttnGatingBlock1 = nn.ModuleList()
+        self.AttnGatingBlock2 = nn.ModuleList()
         for i, out_channels in enumerate(num_filters):
+            if i < 3:
+                self.GatingSignal1.append(Gate_Block(gate_channels[i]))
+                self.GatingSignal2.append(Gate_Block(gate_channels[i]))
+                self.AttnGatingBlock1.append(Attn_Block(skp1_channels[i],gate_channels[i],inter_channels[i]))
+                self.AttnGatingBlock2.append(Attn_Block(skp2_channels[i], gate_channels[i], inter_channels[i]))
             self.upsample.append(nn.Upsample(scale_factor=2, mode='bilinear'))
             self.conv_block.append(Conv_Block(in_channels + skp1_channels[i] + skp2_channels[i], out_channels))
             in_channels = out_channels
 
     def forward(self, x, skip1, skip2):
         for i in range(len(skip2)):
+            if i < 3:
+                x_g1 = self.GatingSignal1[i](x)
+                skip1[i] = self.AttnGatingBlock1[i](skip1[i],x_g1)
+                x_g2 = self.GatingSignal2[i](x)
+                skip2[i] = self.AttnGatingBlock2[i](skip2[i], x_g2)
+
             x = self.upsample[i](x)
             x = torch.cat([x, skip1[i], skip2[i]], dim=1)
             x = self.conv_block[i](x)
@@ -193,18 +250,17 @@ class DoubleUNet(nn.Module):
     def __init__(self):
         super().__init__()
         self.encoder1 = Encoder1(requires_grad=True)
-        self.aspp1 = ASPP(512, 64, [6,12,18])  # 512是VGG（encoder1）输出的通道数，64跟源码保持一致（应该为256比较妥当叭？）
+        self.aspp1 = ASPP(512, 64, [6, 12, 18])  # 512是VGG（encoder1）输出的通道数，64跟源码保持一致（应该为256比较妥当叭？）
         self.decoder1 = Decoder1(64)  # 输出通道数为
         self.encoder2 = Encoder2(3)
-        self.aspp2 = ASPP(256, 64, [6,12,18])
+        self.aspp2 = ASPP(256, 64, [6, 12, 18])
         self.decoder2 = Decoder2(64)
         self.output_block1 = nn.Sequential(nn.Conv2d(32, 1, 1), nn.Sigmoid())
         self.output_block2 = nn.Sequential(nn.Conv2d(32, 1, 1), nn.Sigmoid())  # 可以共享一个output_block吗？
 
     def forward(self, inputs):
         # UNet1
-        x = inputs
-        x, skip_1 = self.encoder1(x)
+        x, skip_1 = self.encoder1(inputs)
         skip_1.reverse()
         x = self.aspp1(x)
         x = self.decoder1(x, skip_1)
@@ -225,5 +281,3 @@ if __name__ == '__main__':
     net = DoubleUNet()
     output = net(x)
     print(output)
-
-
