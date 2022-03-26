@@ -1,7 +1,7 @@
 config = {}
-config['gpu'] = '3'
+config['gpu'] = '0'
 config['out_dir'] = './results'
-config['name'] = "add_AG-ftloss"
+config['name'] = "convtranspose"
 config['epochs'] = 300
 config['batch_size'] = 8
 config['num_workers'] = 4 # 并行读取数据
@@ -15,7 +15,7 @@ config['input_w'] = 256
 config['input_h'] = 256
 config['color_jitter'] = [0.1, 0.1, 0.1, 0.1]  # brightness, contrast, saturation, hue
 
-config['loss'] = 'tversky_focal_loss'        # dice_loss, bce_dice_loss ,tversky_focal_loss
+config['loss'] = 'dice_loss'        # dice_loss, bce_dice_loss ,tversky_focal_loss
 
 config['dataset'] = '/home/xzf/Projects/Datasets/PE_data_pytorch/PAT*'
 config['img_label'] = 'original'      # img文件夹名称

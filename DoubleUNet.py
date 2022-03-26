@@ -136,10 +136,11 @@ class Decoder1(nn.Module):
         super().__init__()
         skp1_channels = [512, 256, 128, 64]
         num_filters = [256, 128, 64, 32]
+        x_channels = [64,256,128,64]
         self.conv_block = nn.ModuleList()
         self.upsample = nn.ModuleList()
         for i, out_channels in enumerate(num_filters):
-            self.upsample.append(nn.Upsample(scale_factor=2, mode='bilinear'))
+            self.upsample.append(nn.ConvTranspose2d(x_channels[i],x_channels[i],2,2))
             self.conv_block.append(Conv_Block(in_channels + skp1_channels[i], out_channels))
             in_channels = out_channels
 
@@ -178,10 +179,11 @@ class Decoder2(nn.Module):
         skp1_channels = [512, 256, 128, 64]
         skp2_channels = [256, 128, 64, 32]
         num_filters = [256, 128, 64, 32]
+        x_channels = [64,256,128,64]
         self.conv_block = nn.ModuleList()
         self.upsample = nn.ModuleList()
         for i, out_channels in enumerate(num_filters):
-            self.upsample.append(nn.Upsample(scale_factor=2, mode='bilinear'))
+            self.upsample.append(nn.ConvTranspose2d(x_channels[i],x_channels[i],2,2))
             self.conv_block.append(Conv_Block(in_channels + skp1_channels[i] + skp2_channels[i], out_channels))
             in_channels = out_channels
 
