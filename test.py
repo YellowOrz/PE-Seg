@@ -1,3 +1,4 @@
+import numpy as np
 import os
 import cv2
 from tqdm import tqdm
@@ -26,41 +27,25 @@ cudnn.benchmark = True
 # model = DoubleUNet(config['num_classes'], config['input_classes'])
 model = DoubleUNet()
 model = model.cuda()
-
-# Data loading code
-img_ids = glob(os.path.join(config['dataset'], 'images', '*' + config['img_ext']))
-img_ids = [os.path.splitext(os.path.basename(p))[0] for p in img_ids]
-
-_, val_img_ids = train_test_split(img_ids, test_size=0.2, random_state=41)
-
-model.load_state_dict(torch.load('models/%s/model.pth' % config['name']))
-
+# DoubleUNetwoDS,convtranspose
+model_name = 'DoubleUNet_tf'
+model.load_state_dict(torch.load('models/%s/model.pth' % model_name))
 model.eval()
+
 # TODO: change dateload
-val_transform = Compose([
-    transforms.Resize(config['input_h'], config['input_w']),
-    transforms.Normalize(),
+test_transforms = utils.data_transforms.Compose([
+    utils.data_transforms.Normalize(),
+    utils.data_transforms.ToTensor(),
 ])
 
-val_dataset = Data(
-    img_ids=val_img_ids,
-    img_dir=os.path.join('inputs', config['dataset'], 'images'),
-    mask_dir=os.path.join('inputs', config['dataset'], 'masks'),
-    img_ext=config['img_ext'],
-    mask_ext=config['mask_ext'],
-    num_classes=config['num_classes'],
-    transforms=val_transform
-)
+test_dataset = utils.data_loaders.DatasetSeq(config['dataset'], config['img_label'], config['mask_label'], 'test',
+                                             config['test_size'], config['num_classes'], test_transforms)
+val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False,
+                                         num_workers=config['num_workers'], pin_memory=True)
 
-val_loader = torch.utils.data.Dataloader(
-    val_dataset,
-    batch_size=config['batch_size'],
-    shuffle=False,
-    num_workers=config['num_workers'],
-    drop_last=False
-)
-
-avg_meter = AverageMeter()
+avg_meters = {'dice_outs': AverageMeter(), 'iou_outs': AverageMeter(),
+              'dice_out1': AverageMeter() , 'iou_out1':AverageMeter(),
+              'dice_out2': AverageMeter() , 'iou_out2':AverageMeter(),}
 
 for c in range(config['num_classes']):
     os.makedirs(os.path.join('outputs', config['name'], str(c)), exist_ok=True)
@@ -75,17 +60,28 @@ with torch.no_grad():
             output = model(input)[-1]
         else:
             output = model(input)
+        dice_score_outs = dice_coef(output, target)
+        iou_outs = iou_score(output,target)
+        # dice_score_outs = dice_coef((output[:,:1]+output[:,1:])/2, target)
+        # iou_outs = iou_score((output[:,:1]+output[:,1:])/2,target)
+        dice_out1 = dice_coef(output[:,:1,:,:],target[:,:1,:,:])
+        iou_out1 = iou_score(output[:, :1, :, :], target[:, :1, :, :])
+        dice_out2 = dice_coef(output[:, 1:, :, :], target[:, 1:, :, :])
+        iou_out2 = iou_score(output[:, 1:, :, :], target[:, 1:, :, :])
+        avg_meters['dice_outs'].update(dice_score_outs, input.size(0))
+        avg_meters['iou_outs'].update(iou_outs, input.size(0))
+        avg_meters['dice_out1'].update(dice_out1, input.size(0))
+        avg_meters['iou_out1'].update(iou_out1, input.size(0))
+        avg_meters['dice_out2'].update(dice_out2, input.size(0))
+        avg_meters['iou_out2'].update(iou_out2, input.size(0))
+        # output = torch.sigmoid(output).cpu().numpy()
+        output = (output > 0.5).cpu().numpy()
+        for c in range(2):
+            cv2.imwrite(os.path.join('outputs', config['name'], str(c), meta[0].split('/')[-1]),
+                        (output[0, c] * 255).astype(np.uint8))
 
-        dice_score = dice_coef(output, target)
-        avg_meter.update(dice_score, input.size(0))
-
-        output = torch.sigmoid(output).cpu().numpy()
-
-        for i in range(len(output)):
-            for c in range(config['num_classes']):
-                cv2.imwrite(os.path.join('outputs', config['name'], str(c), meta['img_id'][i] + '.png'),
-                            (output[i, c] * 255).astype('uint8'))
-
-print('Dice: %.4f' % avg_meter.avg)
-
+# print('Dice: %.4f   iou: %.4f' % avg_meter.avg,iou.avg)
+print('dice_outs:',avg_meters['dice_outs'].avg,'   iou_outs:',avg_meters['iou_outs'].avg)
+print('dice_out1:',avg_meters['dice_out1'].avg,'   iou_out1:',avg_meters['iou_out1'].avg)
+print('dice_out2:',avg_meters['dice_out2'].avg,'   iou_out2:',avg_meters['iou_out2'].avg)
 torch.cuda.empty_cache()

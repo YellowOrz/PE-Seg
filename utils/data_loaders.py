@@ -33,5 +33,5 @@ class DatasetSeq(torch.utils.data.dataset.Dataset):
         mask = cv2.imread(self.mask_path[idx], cv2.IMREAD_GRAYSCALE)
         if self.transform is not None:
             img, mask = self.transform(img, mask)
-        return img, mask
+        return img, mask,self.img_path[idx]
 
