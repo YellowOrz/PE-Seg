@@ -56,79 +56,49 @@ class Encoder1(nn.Module):  # 没有问题，by xzf
                 features.append(x)
         return x, features
 
+class SeparableConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=1, stride=1, padding=0, dilation=1, bias=False):
+        super(SeparableConv2d, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size, stride, padding, dilation, groups=in_channels,
+                               bias=bias)
+        self.pointwise = nn.Conv2d(in_channels, out_channels, 1, 1, 0, 1, 1, bias=bias)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.pointwise(x)
+        return x
 
 class ASPP(nn.Module):
     def __init__(self, in_channel, out_channel, rate):
         super(ASPP, self).__init__()
+        self.blocks = nn.ModuleList()
+        #rate = 1
+        self.blocks.append(nn.Sequential(SeparableConv2d(in_channel, out_channel),
+                                         nn.BatchNorm2d(out_channel),))
+
+        for r in rate:
+            self.blocks.append(nn.Sequential(SeparableConv2d(in_channel, out_channel, 3, 1, r,r),
+                                             nn.BatchNorm2d(out_channel),
+                                             SeparableConv2d(out_channel, out_channel, 3, 1, 1),
+                                             nn.BatchNorm2d(out_channel),
+                                             nn.ReLU(inplace=True),))
+        self.project = nn.Sequential(SeparableConv2d(in_channel+out_channel * (len(self.blocks)+1), out_channel, 1, bias=False),
+                                     nn.BatchNorm2d(out_channel),
+                                     nn.ReLU(inplace=True))
 
         self.pool = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
                                     nn.Conv2d(in_channel, out_channel, 1),
                                     nn.BatchNorm2d(out_channel),
                                     nn.ReLU(inplace=True))
-        self.blocks = nn.ModuleList()
-        self.blocks.append(nn.Sequential(nn.Conv2d(in_channel, out_channel, 1, bias=False),
-                                    nn.BatchNorm2d(out_channel),
-                                    nn.ReLU(inplace=True)))
-        for r in rate:
-            self.blocks.append(nn.Sequential(nn.Conv2d(in_channel, out_channel, 3, padding=r, dilation=r, bias=False),
-                                    nn.BatchNorm2d(out_channel),
-                                    nn.ReLU(inplace=True)))
-        self.project = nn.Sequential(nn.Conv2d(out_channel * (len(self.blocks)+1), out_channel, 1, bias=False),
-                                     nn.BatchNorm2d(out_channel),
-                                     nn.ReLU(inplace=True))
-
     def forward(self, x):
         size = x.shape[2:]
         y = []
-        y.append(nn.functional.interpolate(self.pool(x), size=size, mode='bilinear', align_corners=False))
+        y.append(x)
+        y.append(nn.functional.interpolate(self.pool(x), size=size, mode='bilinear', align_corners=True))
         for block in self.blocks:
             y.append(block(x))
         y = torch.cat(y, dim=1)
         return self.project(y)
-
-
-# class ASPP(nn.Module):
-#     # https://github.com/pytorch/vision/blob/main/torchvision/models/segmentation/deeplabv3.py
-#     def __init__(self, in_channels: int, atrous_rates: List[int], out_channels: int = 256) -> None:
-#         super(ASPP, self).__init__()
-#         modules = []
-#         modules.append(nn.Sequential(nn.Conv2d(in_channels, out_channels, 1, bias=False),
-#             nn.BatchNorm2d(out_channels),nn.ReLU(inplace=True)))
-#
-#         rates = tuple(atrous_rates)
-#         for rate in rates:
-#             modules.append(ASPPConv(in_channels, out_channels, rate))
-#         modules.append(ASPPPooling(in_channels, out_channels))
-#
-#         self.convs = nn.ModuleList(modules)
-#         self.project = nn.Sequential(nn.Conv2d(len(self.convs) * out_channels, out_channels, 1, bias=False),
-#             nn.BatchNorm2d(out_channels),nn.ReLU(inplace=True),nn.Dropout(0.5))
-#
-#     def forward(self, x: torch.Tensor) -> torch.Tensor:
-#         _res = []
-#         for conv in self.convs:
-#             _res.append(conv(x))
-#         res = torch.cat(_res, dim=1)
-#         return self.project(res)
-#
-#
-# class ASPPConv(nn.Sequential):
-#     def __init__(self, in_channels: int, out_channels: int, dilation: int) -> None:
-#         modules = [nn.Conv2d(in_channels, out_channels, 3, padding=dilation, dilation=dilation, bias=False),
-#             nn.BatchNorm2d(out_channels),nn.ReLU(inplace=True)]
-#         super(ASPPConv, self).__init__(*modules)
-#
-#
-# class ASPPPooling(nn.Sequential):
-#     def __init__(self, in_channels: int, out_channels: int) -> None:
-#         super(ASPPPooling, self).__init__(nn.AdaptiveAvgPool2d(1),nn.Conv2d(in_channels, out_channels, 1, bias=False),
-#             nn.BatchNorm2d(out_channels),nn.ReLU(inplace=True))
-#
-#     def forward(self, x: torch.Tensor) -> torch.Tensor:
-#         size = x.shape[-2:]
-#         for mod in self:
-#             x = mod(x)
-#         return F.interpolate(x, size=size, mode='bilinear', align_corners=False)
 
 
 class Decoder1(nn.Module):

@@ -1,9 +1,9 @@
 config = {}
-config['gpu'] = '3'
+config['gpu'] = '1'
 config['out_dir'] = './results'
-config['name'] = "add_AG-ftloss"
+config['name'] = "DASPP"
 config['epochs'] = 300
-config['batch_size'] = 8
+config['batch_size'] = 4
 config['num_workers'] = 4 # 并行读取数据
 config['val_frequency'] = 2
 
@@ -27,7 +27,7 @@ config['lr'] = 1e-4
 # config['weight_decay'] = 0        # 1e-3, 官方tf用的adam没有weight decay
 config['momentum'] = 0.9
 config['nesterov'] = False
-config['VGG_BN'] = True
+config['VGG_BN'] = False
 
 config['scheduler'] = 'ReduceLROnPlateau'
 config['min_lr'] = 1e-8
