@@ -27,7 +27,6 @@ config['lr'] = 1e-4
 # config['weight_decay'] = 0        # 1e-3, 官方tf用的adam没有weight decay
 config['momentum'] = 0.9
 config['nesterov'] = False
-config['VGG_BN'] = True
 
 config['scheduler'] = 'ReduceLROnPlateau'
 config['min_lr'] = 1e-8

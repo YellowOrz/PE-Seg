@@ -35,14 +35,10 @@ class Conv_Block(nn.Module):
 
 
 class Encoder1(nn.Module):  # 没有问题，by xzf
-    def __init__(self, requires_grad=False, BN=False):
+    def __init__(self, requires_grad=False):
         super().__init__()
-        if BN:
-            self.feature_list = [5, 12, 25, 38]
-            base_model = tv.models.vgg19_bn(pretrained=True).features
-        else:
-            self.feature_list = [3, 8, 17, 26]
-            base_model = tv.models.vgg19(pretrained=True).features
+        self.feature_list = [3, 8, 17, 26]
+        base_model = tv.models.vgg19(pretrained=True).features
         self.model = nn.Sequential(*list(base_model.children())[:len(base_model)-1])
         if not requires_grad:       # vgg无需梯度更新
             for param in self.parameters():
@@ -196,9 +192,9 @@ class Decoder2(nn.Module):
 
 
 class DoubleUNet(nn.Module):
-    def __init__(self, VGG_BN):
+    def __init__(self):
         super().__init__()
-        self.encoder1 = Encoder1(requires_grad=True, BN=VGG_BN)
+        self.encoder1 = Encoder1(requires_grad=True)
         self.aspp1 = ASPP(512, 64, [6,12,18])  # 512是VGG（encoder1）输出的通道数，64跟源码保持一致（应该为256比较妥当叭？）
         self.decoder1 = Decoder1(64)  # 输出通道数为
         self.encoder2 = Encoder2(3)

@@ -123,7 +123,7 @@ if __name__ == '__main__':
     writer = SummaryWriter(output_folder)
     cudnn.benchmark = True
 
-    model = DoubleUNet(config['VGG_BN']).cuda()
+    model = DoubleUNet().cuda()
     # model.apply(init_weights_kaiming)
     print_network(model)
 
